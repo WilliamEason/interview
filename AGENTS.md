@@ -21,7 +21,7 @@ Fail closed: if the answer cannot be determined, the answer is "no".
 
 ## Status
 
-Scaffolding only. Packages contain `doc.go` files describing intent; no domain logic exists yet. Do not add behaviour beyond the current task.
+The first flow ("can User A BUY?") is implemented end to end with in-memory storage and an HTTP server (`go run ./cmd/kycd`, default `localhost:8080`, override with `KYC_ADDR`). Do not add behaviour beyond the current task.
 
 ## Tech stack and tools
 
@@ -110,18 +110,21 @@ Enforce with an architecture test (a `_test.go` that runs `go list -deps` / `go/
 Inbound/outbound payloads are plain Go structs with `json` tags living in `internal/interfaces/httpapi`. They are transport DTOs only:
 
 - Never put `json` tags on domain types. Map DTO <-> domain explicitly.
-- Use `snake_case` JSON field names. Timestamps are RFC 3339 UTC. IDs are UUID strings.
-- Validate and parse at the edge (e.g. bad UUID -> 400) before calling the use case.
-- Responses for a denial are `200` with `"allowed": false` and machine-readable reason codes; `4xx/5xx` are for bad requests and failures to decide.
+- JSON keys are `UPPER_SNAKE_CASE`. IDs are UUID strings. The user ID is in the URL path, not the body.
+- Validate and parse at the edge (bad UUID, malformed JSON, unknown action -> 400) before calling the use case.
+- A denial is `200` with `"PERMISSION": "DENIED"` and machine-readable `REASONS`; `4xx/5xx` are for bad requests and failures to decide (never `APPROVED` on failure).
 
-Planned first endpoint (shape is provisional):
+Endpoint:
 
 ```
-POST /v1/eligibility
-{ "user_id": "<uuid>", "action": "BUY" }
+POST /v1/users/{user_id}/eligibility
+{ "ACTION": "BUY" }
 ->
-{ "user_id": "<uuid>", "action": "BUY", "allowed": false, "reasons": ["SANCTIONS_SCREENING_MISSING"] }
+{ "USER_ID": "<uuid>", "ACTION": "BUY", "PERMISSION": "APPROVED" }
+{ "USER_ID": "<uuid>", "ACTION": "BUY", "PERMISSION": "DENIED", "REASONS": ["SANCTIONS_HIT"] }
 ```
+
+`REASONS` is omitted when approved.
 
 ## Testing
 
