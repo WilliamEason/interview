@@ -50,16 +50,24 @@ func eligibility(svc Checker) http.HandlerFunc {
 			return
 		}
 
-		resp := eligibilityResponse{UserID: id.String(), Action: string(action), Permission: permissionDenied}
-		if d.Allowed {
-			resp.Permission = permissionApproved
-		} else {
-			for _, reason := range d.Reasons {
-				resp.Reasons = append(resp.Reasons, string(reason))
-			}
-		}
-		writeJSON(w, http.StatusOK, resp)
+		writeJSON(w, http.StatusOK, toResponse(id, action, d))
 	}
+}
+
+// toResponse maps a domain decision to the wire response. It is the single
+// place that sets PERMISSION and REASONS: approved carries no reasons,
+// denied carries the machine-readable reason codes.
+func toResponse(id user.ID, action kyc.Action, d kyc.Decision) eligibilityResponse {
+	resp := eligibilityResponse{UserID: id.String(), Action: string(action)}
+	if d.Allowed {
+		resp.Permission = permissionApproved
+		return resp
+	}
+	resp.Permission = permissionDenied
+	for _, reason := range d.Reasons {
+		resp.Reasons = append(resp.Reasons, string(reason))
+	}
+	return resp
 }
 
 func writeJSON(w http.ResponseWriter, status int, v any) {
